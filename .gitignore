@@ -1,4 +1,8 @@
 *.class
+*.pyc
+
+# Large data file 
+train_triplets.txt
 
 # Package Files #
 *.jar
