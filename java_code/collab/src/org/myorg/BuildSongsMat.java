@@ -61,7 +61,7 @@ public class BuildSongsMat {
 
 //			     FileInputFormat.addInputPath(job, new Path(args[0]));
 //			     FileOutputFormat.setOutputPath(job, new Path(args[1]));
-     FileInputFormat.addInputPath(job, new Path("/Users/dave/proj/MRProj/data/train_triplets.txt"));
+     FileInputFormat.addInputPath(job, new Path("/Users/dave/proj/MRProj/data/train_triplets_mini.txt"));
      FileOutputFormat.setOutputPath(job, new Path("/Users/dave/proj/MRProj/output/build_mat/" + Long.toString(unixTime)));
      job.waitForCompletion(true);
    }
