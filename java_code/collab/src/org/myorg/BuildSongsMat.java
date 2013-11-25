@@ -1,6 +1,8 @@
 package org.myorg;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
@@ -22,8 +24,7 @@ public class BuildSongsMat {
 			String string = value.toString();
 //			parts = (user_id, song_id, play_count)
 			String[] parts = string.split("\t");
-//			Not sending the counts ahead as we are binning the vector
-			context.write(new Text(parts[0]), new Text(parts[1]));
+			context.write(new Text(parts[0]), new Text(parts[1] + ":" + parts[2]));
 		}
 	}
 	
@@ -31,9 +32,18 @@ public class BuildSongsMat {
 	public static class BuildSongsMatRed extends Reducer<Text, Text, Text, Text> {
 	   public void reduce(Text key, Iterable<Text> values, Context context) 
 	     throws IOException, InterruptedException {
+		   HashMap<String, Integer> h = new HashMap<String, Integer>();
 	       String full = "";
 	       for (Text val : values) {
-	           full += val.toString() + ",";
+	    	   // parts[0] is the songid and parts[1] is the count
+	    	   String[] parts = val.toString().split(":");
+	    	   h.put(parts[0], new Integer(parts[1]));
+	       }
+	       for (Map.Entry<String, Integer> entry : h.entrySet()) {
+	    	   String mapkey = (String) entry.getKey();
+	    	   Integer value = (Integer) entry.getValue();
+//	    	   System.out.print("Here:" + mapkey + value.toString());
+	    	   full += mapkey + ":" + value.toString() + ",";
 	       }
 	       // String will definitely contain something as a user cannot exists who has not listened to a song
 	       context.write(key, new Text(full.substring(0, full.length()-1)));
@@ -53,7 +63,7 @@ public class BuildSongsMat {
 	 job.setMapOutputValueClass(Text.class);
 	 job.setInputFormatClass(TextInputFormat.class);
 	 job.setOutputFormatClass(TextOutputFormat.class);
-	 job.setCombinerClass(BuildSongsMatRed.class);
+//	 job.setCombinerClass(BuildSongsMatRed.class);
 //				 job.setPartitionerClass(WordPartitioner.class);
 //				 job.setNumReduceTasks(5);
 	 
