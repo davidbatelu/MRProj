@@ -1,6 +1,8 @@
 MRProj
 ======
 
+You can make the java_code folder a workspace in Eclipse.
+
 
 The directory structure is shown below.
 Directory - data
