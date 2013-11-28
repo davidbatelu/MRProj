@@ -1,0 +1,4 @@
+INDEX VERSION 1.126+/Users/dave/proj/MRProj/java_code/.metadata/.plugins/org.eclipse.jdt.core
+2998729958.index
+3741068046.index
+3499563751.index

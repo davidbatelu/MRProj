@@ -1,0 +1,60 @@
+package org.myorg;
+import java.io.IOException;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.*;
+import org.apache.hadoop.mapreduce.*;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
+
+import no.uib.cipr.matrix.sparse.SparseVector;
+
+public class Collab {
+	public static class PreMap extends Mapper<LongWritable, Text, String, Integer> {
+		public void map(LongWritable key, Text value, Context context) throws InterruptedException, IOException {
+			String string = value.toString();
+//			parts = (user_id, song_id, play_count)
+			String[] parts = string.split("\t");
+			context.write(parts[1], Integer.parseInt(parts[2]));
+		}
+	}
+	
+	public static class PreReduce extends Reducer<String, Integer, String, Integer> {
+	   public void reduce(String key, Iterable<Integer> values, Context context) 
+	     throws IOException, InterruptedException {
+	       int sum = 0;
+	       for (Integer val : values) {
+	           sum += val;
+	       }
+	       context.write(key, sum);
+	   }
+	}
+	
+	public static void main(String[] args) throws Exception {
+	 Configuration conf = new Configuration();
+	 long unixTime = System.currentTimeMillis() / 1000L;
+
+	 Job job = new Job(conf, "collab");
+	 job.setOutputKeyClass(Text.class);
+	 job.setOutputValueClass(IntWritable.class);
+	 job.setMapperClass(PreMap.class);
+	 job.setReducerClass(PreReduce.class);
+	 job.setInputFormatClass(TextInputFormat.class);
+	 job.setOutputFormatClass(TextOutputFormat.class);
+//		 job.setCombinerClass(Reduce.class);
+//		 job.setPartitionerClass(WordPartitioner.class);
+//		 job.setNumReduceTasks(5);
+	 
+	 job.setJarByClass(Collab.class);
+
+//	     FileInputFormat.addInputPath(job, new Path(args[0]));
+//	     FileOutputFormat.setOutputPath(job, new Path(args[1]));
+     FileInputFormat.addInputPath(job, new Path("/Users/dave/proj/MRProj/data/train_triplets.txt"));
+     FileOutputFormat.setOutputPath(job, new Path("/Users/dave/proj/MRProj/output" + Long.toString(unixTime)));
+     job.waitForCompletion(true);
+   }
+		
+}

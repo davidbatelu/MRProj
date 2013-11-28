@@ -1,0 +1,10 @@
+package org.myorg;
+
+import org.apache.hadoop.io.BytesWritable;
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Mapper;
+
+public class kmeans {
+	public static class CFMap extends Mapper<LongWritable, Text, Text, Text> {
+}
