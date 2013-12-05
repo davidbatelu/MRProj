@@ -3,6 +3,7 @@
 
 # Large data file 
 train_triplets.txt
+.metadata/
 
 # Package Files #
 *.jar
