@@ -24,10 +24,6 @@ import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 public class Kmeans {
 	static int K = 3, features = 2;
 	
-	public enum MyCounters {
-        Count
-	}
-	
 	public static final double measureDistance(Double[] center, Double[]  v) {
 	  double sum = 0;
 	  // Ignore last label
