@@ -1,0 +1,47 @@
+package org.myorg;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.BytesWritable;
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
+import org.myorg.CollaborativeFiltering.CFMap;
+import org.myorg.CollaborativeFiltering.CFRed;
+
+public class kmeans {
+	public static class CFMap extends Mapper<LongWritable, Text, Text, Text> {
+		
+	}
+	
+	public static void main(String[] args) throws Exception {
+		 Configuration conf = new Configuration();
+		 long unixTime = System.currentTimeMillis() / 1000L;
+
+		 Job job = new Job(conf, "cf");
+		 job.setOutputKeyClass(Text.class);
+		 job.setOutputValueClass(Text.class);
+		 job.setMapperClass(CFMap.class);
+		 job.setReducerClass(CFRed.class);
+		 job.setMapOutputKeyClass(Text.class);
+		 job.setMapOutputValueClass(BytesWritable.class);
+		 job.setInputFormatClass(TextInputFormat.class);
+		 job.setOutputFormatClass(TextOutputFormat.class);
+//		 job.setCombinerClass(CFRed.class);
+//					 job.setPartitionerClass(WordPartitioner.class);
+//					 job.setNumReduceTasks(5);
+		 
+		 job.setJarByClass(CollaborativeFiltering.class);
+
+//	     FileInputFormat.addInputPath(job, new Path(args[0]));
+//	     FileOutputFormat.setOutputPath(job, new Path(args[1]));
+	     FileInputFormat.addInputPath(job, new Path("/Users/dave/proj/MRProj/output/build_mat/1385316530/part-r-00000"));
+	     FileOutputFormat.setOutputPath(job, new Path("/Users/dave/proj/MRProj/output/collab/" + Long.toString(unixTime)));
+	     job.waitForCompletion(true);
+	   }
+}

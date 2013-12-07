@@ -1,0 +1,138 @@
+package org.myorg;
+
+import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.HashMap;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.BytesWritable;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.Mapper.Context;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
+
+
+public class Kmeans {
+	static int K = 10;
+	public static final double measureDistance(Double[] center, Double[]  v) {
+	  double sum = 0;
+	  int length = v.length;
+	  // Ignore last label
+	  for (int i = 0; i < length -1 ; i++) {
+		  sum += Math.abs(center[i] - v[i]);
+	  }
+	 
+	  return sum;
+	}
+	public static class KMap extends Mapper<LongWritable, Text, IntWritable, Text> {
+		static Double[][] centers;
+		@SuppressWarnings("deprecation")
+		public static Double[][] load_centers(FileSystem fs) throws IOException {
+	        String line;
+	        Double[][] temp_centers = new Double[K][];
+			FSDataInputStream cache = fs.open(new Path("/user/dave/centers.txt"));
+		   try {
+			   int i = 0;
+			   while((line = cache.readLine()) != null ){
+	               String[] parts = line.trim().split(" ");
+	               temp_centers[i] = new Double[parts.length];
+	               for (int j = 0; j < parts.length; j++) {
+	            	   temp_centers[i][j] = Double.parseInt(parts[j]);
+	               }
+			   }
+		   } catch (IOException e) {
+		                   // TODO Auto-generated catch block
+		            e.printStackTrace();
+		   }
+		   return temp_centers;
+		}
+		
+		public void setup(Context context) throws IOException {
+			   System.out.print("In setup");
+			   FileSystem fs;
+			   try {
+					fs = FileSystem.get(new URI("/user/dave"),context.getConfiguration());
+					centers = load_centers(fs);
+			   } catch (URISyntaxException e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+			   }
+		   }
+		
+		public void map(LongWritable key, Text value, Context context) throws InterruptedException, IOException {
+			String[] parts = value.toString().split("\t");
+			Double[] row = new Double[parts.length];
+			int i = 0, minIdx = -1;
+			for (String part : parts) {
+				row[i] = new Double(part);
+				i++;
+			}
+			double min = 99999999.0;
+			for (int c = 0; c < centers.length; c++) {
+				double curDst = measureDistance(centers[c], row);
+				if (min < curDst) {
+					curDst = min;
+					minIdx = c;
+				}
+			}
+			context.write(new IntWritable(minIdx), value);
+		}
+	}
+	
+	public static class KRed extends Reducer<IntWritable, Text, Text, Text> {
+		public void reduce(Text key, Iterable<Text> values, Context context) 
+			     throws IOException, InterruptedException {
+			int num = 0;
+			Double[] feature_sum;
+			for (Text value : values) {
+				String[] parts = value.toString().split("\t");
+				Double[] row = new Double[parts.length];
+				int i = 0;
+				for (String part : parts) {
+					row[i] = new Double(part);
+					i++;
+				}
+				num++;
+			}
+		}
+		
+		
+	}
+	
+	public static void main(String[] args) throws Exception {
+		 Configuration conf = new Configuration();
+		 long unixTime = System.currentTimeMillis() / 1000L;
+
+		 Job job = new Job(conf, "kmeans");
+		 job.setOutputKeyClass(Text.class);
+		 job.setOutputValueClass(Text.class);
+		 job.setMapperClass(KMap.class);
+		 job.setReducerClass(KRed.class);
+		 job.setMapOutputKeyClass(IntWritable.class);
+		 job.setMapOutputValueClass(Text.class);
+		 job.setInputFormatClass(TextInputFormat.class);
+		 job.setOutputFormatClass(TextOutputFormat.class);
+//		 job.setCombinerClass(CFRed.class);
+//					 job.setPartitionerClass(WordPartitioner.class);
+//					 job.setNumReduceTasks(5);
+		 
+		 job.setJarByClass(Kmeans.class);
+
+//	     FileInputFormat.addInputPath(job, new Path(args[0]));
+//	     FileOutputFormat.setOutputPath(job, new Path(args[1]));
+	     FileInputFormat.addInputPath(job, new Path("/Users/dave/proj/MRProj/output/build_mat/1385316530/part-r-00000"));
+	     FileOutputFormat.setOutputPath(job, new Path("/Users/dave/proj/MRProj/output/collab/" + Long.toString(unixTime)));
+	     job.waitForCompletion(true);
+	 }
+}

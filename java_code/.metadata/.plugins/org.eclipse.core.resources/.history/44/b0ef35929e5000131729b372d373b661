@@ -1,0 +1,21 @@
+package org.myorg;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.*;
+import org.apache.hadoop.mapreduce.*;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
+import no.uib.cipr.matrix.sparse.SparseVector;
+
+public class Collab {
+	public static class PreMap extends Mapper<LongWritable, Text, String, String> {
+		public void map(LongWritable key, Text value, Context context) throws InterruptedException {
+			String string = value.toString();
+//			parts = (user_id, song_id, play_count)
+			String[] parts = string.split("\t");
+			context.write(parts[1], parts[2]);
+	}
+		
+}
