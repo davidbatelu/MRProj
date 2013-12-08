@@ -249,6 +249,7 @@ public class Kmeans {
 	}
 	
 	public static void main(String[] args) throws Exception {
+		int failures = 0;
 		long counter = 0;
 		
 		Configuration rconf = new Configuration();
@@ -268,9 +269,12 @@ public class Kmeans {
 		FileInputFormat.addInputPath(rjob, new Path(args[0]));
 		
 		FileOutputFormat.setOutputPath(rjob, new Path("outp.0"));
-		rjob.waitForCompletion(true);
-		
-		System.out.print("Finished with job1");
+		boolean ret_val = rjob.waitForCompletion(true);
+		if (!ret_val) {
+			System.out.print("RANDOM CENTERS JOB FAILURE!!!");
+			System.exit(0);
+		}
+		System.out.print("Finished with random centers");
 		
 		while (!converged(counter, fs) && counter < MAX_ITR) {
 			 Configuration conf = new Configuration();
@@ -296,7 +300,17 @@ public class Kmeans {
 		     FileOutputFormat.setOutputPath(job, new Path("outp." + counter));
 	//	     FileInputFormat.addInputPath(job, new Path("/Users/dave/proj/MRProj/output/build_mat/1385316530/part-r-00000"));
 	//	     FileOutputFormat.setOutputPath(job, new Path("/Users/dave/proj/MRProj/output/collab/" + Long.toString(unixTime)));
-		     job.waitForCompletion(true);
+		     ret_val = job.waitForCompletion(true);
+		     if (!ret_val) {
+		    	 if (failures < 2) {
+		    		 failures++;
+		    		 fs.delete(new Path("outp." + counter), true);
+		    		 counter--;
+		    	 } else {
+		    		 System.out.print("KMEANS JOB FAILURE!!!");
+		    		 break;
+		    	 }
+		     }
 		}
 	 }
 }
