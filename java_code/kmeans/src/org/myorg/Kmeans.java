@@ -26,6 +26,7 @@ import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 public class Kmeans {
 	static int K = 3, features = 2;
 	static Random generator;
+	static long MAX_ITR = 10;
 	public static class RCMap extends Mapper<LongWritable, Text, DoubleWritable, Text> {
 		public void setup(Context context) throws IOException {
 			generator = new Random();
@@ -38,12 +39,12 @@ public class Kmeans {
 		}
 	}
 	
-	public static class RCRed extends Reducer<DoubleWritable, Text, DoubleWritable, Text> {
+	public static class RCRed extends Reducer<DoubleWritable, Text, Text, Text> {
 		public void reduce(DoubleWritable key, Iterable<Text> values, Context context) 
 			     throws IOException, InterruptedException {
 			System.out.print("Reduce with " + key.toString());
 			for (Text value : values) {
-				context.write(key, value);
+				context.write(value, new Text(""));
 			}
 		}
 	}
@@ -70,9 +71,9 @@ public class Kmeans {
 			   System.out.print(line + "\n");
                String[] parts = line.trim().split(" |\t");
                // Ignore the first number as it is the random number
-               temp_centers[i] = new Double[parts.length - 1];
-               for (int j = 1; j < parts.length; j++) {
-            	   temp_centers[i][j-1] = Double.parseDouble(parts[j]);
+               temp_centers[i] = new Double[parts.length];
+               for (int j = 0; j < parts.length; j++) {
+            	   temp_centers[i][j] = Double.parseDouble(parts[j]);
                }
                i++;
 		   }
@@ -225,24 +226,36 @@ public class Kmeans {
 		}
 	}
 	
-	public static boolean converged(long counter) {
-//		if (counter <= 2) {
-//			return false;
-//		} else {
-//			
-//		}
-		return false;
+	public static boolean converged(long counter, FileSystem fs) throws IOException {
+		boolean conv = true;
+		if (counter <= 2) {
+			return false;
+		} else {
+			Double[][] centers_new = load_centers(fs, "outp." + counter);
+			Double[][] centers_old = load_centers(fs, "outp." + (counter-1));
+			for (int i =0; i < centers_new.length; i++) {
+				double cur_diff = 0;
+				for (int j = 0; j < centers_new[i].length; j++) {
+					double diff = centers_new[i][j] - centers_old[i][j];
+					diff = (diff < 0) ? -diff : diff;
+					cur_diff += diff;
+				}
+				if ( cur_diff > 1 ) {
+					conv = false;
+				}
+			}
+		}
+		return conv;
 	}
 	
 	public static void main(String[] args) throws Exception {
 		long counter = 0;
-		long max_itr = 10;
 		
 		Configuration rconf = new Configuration();
 		Job rjob = new Job(rconf, "randcent");
 		FileSystem fs = FileSystem.get(new URI("/user/dave"), rconf);
 		fs.delete(new Path("outp.0"), true);
-		rjob.setOutputKeyClass(DoubleWritable.class);
+		rjob.setOutputKeyClass(Text.class);
 		rjob.setOutputValueClass(Text.class);
 		rjob.setMapperClass(RCMap.class);
 		rjob.setReducerClass(RCRed.class);
@@ -259,7 +272,7 @@ public class Kmeans {
 		
 		System.out.print("Finished with job1");
 		
-		while (!converged(counter) && counter < max_itr) {
+		while (!converged(counter, fs) && counter < MAX_ITR) {
 			 Configuration conf = new Configuration();
 			 conf.set("my.centers.path", "outp." + String.valueOf(counter));	
 			 Job job = new Job(conf, "kmeans");
