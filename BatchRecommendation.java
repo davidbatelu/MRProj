@@ -137,7 +137,6 @@ public class BatchRecommendation {
 	    	}
 	      
 	        Job job = new Job(conf, "cf");
-	        job.setJarByClass(CollaborativeFiltering.class);
 	        job.setMapperClass(CFMap.class);
 	        job.setMapOutputKeyClass(Text.class);
 		job.setMapOutputValueClass(Text.class);
