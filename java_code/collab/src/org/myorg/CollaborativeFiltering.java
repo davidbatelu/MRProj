@@ -7,8 +7,10 @@ import java.io.ObjectOutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.text.DecimalFormat;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.TreeMap;
 
 import org.apache.commons.io.output.ByteArrayOutputStream;
 import org.apache.hadoop.conf.Configuration;
@@ -75,9 +77,8 @@ public class CollaborativeFiltering {
 		System.out.print("In load_hash");
 		String line;
 		// FSDataInputStream cache = fs.open(new Path("/user/dave/counts.txt"));
-		//FSDataInputStream cache = fs.open(new Path(
-		//		"/Users/nischintr/output2/part-r-00000"));
-		FSDataInputStream cache = fs.open(new Path("s3n://mrproj/input/op2"));
+		FSDataInputStream cache = fs.open(new Path("/Users/nischintr/output2mini/part-r-00000"));
+		//FSDataInputStream cache = fs.open(new Path("s3n://mrproj/input/op2"));
 		HashMap<String, Integer> hash = new HashMap<String, Integer>();
 		try {
 			while ((line = cache.readLine()) != null) {
@@ -126,10 +127,8 @@ public class CollaborativeFiltering {
 			try {
 				// fs = FileSystem.get(new
 				// URI("/user/dave"),context.getConfiguration());
-				// fs = FileSystem.get(new URI("/Users/nischintr"),
-				//		context.getConfiguration());
-				fs = FileSystem.get(new URI("s3n://mrproj"),
-								context.getConfiguration());
+				fs = FileSystem.get(new URI("/Users/nischintr"), context.getConfiguration());
+				//fs = FileSystem.get(new URI("s3n://mrproj"),context.getConfiguration());
 				counts = load_hash(fs);
 			} catch (URISyntaxException e1) {
 				// TODO Auto-generated catch block
@@ -137,13 +136,14 @@ public class CollaborativeFiltering {
 			}
 		}
 
-		public float Similarity(int type, Integer dotij, Integer ni, Integer nj) {
+		public Double computeSimilarity(int type, Integer dotij, Integer ni,
+				Integer nj) {
 			switch (type) {
 			case 0:
 				// Jaccard
-				return (float) dotij / (ni + nj + dotij);
+				return (double) dotij / (ni + nj + dotij);
 			default:
-				return (float) dotij;
+				return (double) dotij;
 			}
 		}
 
@@ -164,7 +164,7 @@ public class CollaborativeFiltering {
 				}
 			}
 			// String str = new String();
-			HashMap<String, String> S = new HashMap<String, String>();
+			HashMap<String, Double> S = new HashMap<String, Double>();
 			DecimalFormat d = new DecimalFormat("#.#####");
 			for (Map.Entry<String, Integer> entry : map.entrySet()) {
 				String mapkey = (String) entry.getKey();
@@ -173,16 +173,50 @@ public class CollaborativeFiltering {
 				// we have values other thank just 1
 				// Have to do an actual similarity function here.
 				// Figure out how we'll get the norms
-				Float tmpval = Similarity(0, value, counts.get(key.toString()),
-						counts.get(mapkey));
-				S.put(mapkey, d.format(tmpval));
+				Double tmpval = computeSimilarity(0, value,
+						counts.get(key.toString()), counts.get(mapkey));
+				// S.put(mapkey, d.format(tmpval));
+				S.put(mapkey, tmpval);
 				// str += mapkey + ":" + tmpval.toString() + ",";
 			}
 			// String will definitely contain something as a user cannot exists
 			// who has not listened to a song
 			// TODO: Remove curly braces from start and end
-			String str = S.toString();
-			context.write(key, new Text(str.substring(1, str.length() - 1)));
+
+			ValueComparator vc = new ValueComparator(S);
+			TreeMap<String, Double> sorted_map = new TreeMap<String, Double>(vc);
+			sorted_map.putAll(S);
+			String output = "";
+			Integer counter = 1;
+			for (Map.Entry<String, Double> entry : sorted_map.entrySet()) {
+				output += entry.getKey() + "=" + d.format(entry.getValue()) + ",";
+				counter++;
+				if (counter > 100)
+					break;
+			}
+			// System.out.println(output.substring(0,output.length()-1));
+
+			context.write(key,
+					new Text(output.substring(0, output.length() - 1)));
+		}
+	}
+
+	public static class ValueComparator implements Comparator<String> {
+
+		Map<String, Double> base;
+
+		public ValueComparator(Map<String, Double> base) {
+			this.base = base;
+		}
+
+		// Note: this comparator imposes orderings that are inconsistent with
+		// equals.
+		public int compare(String a, String b) {
+			if (base.get(a) >= base.get(b)) {
+				return -1;
+			} else {
+				return 1;
+			} // returning 0 would merge keys
 		}
 	}
 
@@ -200,7 +234,7 @@ public class CollaborativeFiltering {
 		job.setInputFormatClass(TextInputFormat.class);
 		job.setOutputFormatClass(TextOutputFormat.class);
 		job.setCombinerClass(CFCom.class);
-		
+
 		// job.setPartitionerClass(WordPartitioner.class);
 		// job.setNumReduceTasks(5);
 
