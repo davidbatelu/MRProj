@@ -23,8 +23,41 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 
 
-public class Kmeans {
-	static int K = 3, features = 2;
+public class KMeans {
+	
+	static final int ARTIST_FAMILIARITY = 0; 
+	static final int ARTIST_HOTNESS = 1;
+	static final int ARTIST_ID = 2;
+	static final int ARTIST_LATITUDE = 3;
+	static final int ARTIST_LONGITITUDE = 4;
+	static final int ARTIST_LOCATION = 5;
+	static final int ARTIST_NAME = 6;
+	static final int RELEASE = 7;
+	static final int SONG_HOTNESS = 8;
+	static final int TITLE = 9;
+	static final int SONG_ID = 10;
+	static final int DANCEABILITY = 11;
+	static final int ENERGY = 12;
+	static final int ARTISTS_TERMS_FREQ_LENGTH = 12;
+	static final int ARTISTS_TERMS_FREQ_ELEM = 13;
+	static final int DURATION = 14;
+	static final int KEY = 15;
+	static final int LOUDNESS = 16;
+	static final int MODE = 17;
+	static final int TEMPO = 18;
+	static final int TIME_SIGNATURE = 19;
+	static final int SEGMENT_LOUDNESS = 20;
+	static final int SEGMENT_TIMBRE = 21;
+	static final int YEAR = 22;
+	static final int GENRE = 23;
+	static final int SIMILAR_ARTISTS = 24;
+	static final int ARTIST_TERMS = 25;
+	
+	// All numerical features
+	static final Integer []REQUIRED_FIELDS = {ARTIST_FAMILIARITY, ARTIST_HOTNESS, SONG_HOTNESS, DANCEABILITY, ENERGY, 
+		DURATION, KEY, LOUDNESS, MODE, TEMPO, TIME_SIGNATURE, SEGMENT_LOUDNESS, SEGMENT_TIMBRE, YEAR};
+	
+	static int K = 3, features_length = REQUIRED_FIELDS.length;
 	static Random generator;
 	static long MAX_ITR = 10;
 	public static class RCMap extends Mapper<LongWritable, Text, DoubleWritable, Text> {
@@ -52,8 +85,8 @@ public class Kmeans {
 	public static final double measureDistance(Double[] center, Double[]  v) {
 	  double sum = 0;
 	  // Ignore last label
-	  for (int i = 0; i < features ; i++) {
-		  sum += Math.abs(center[i] - v[i]);
+	  for (int i = 0; i < features_length ; i++) {
+		  sum += Math.abs(center[REQUIRED_FIELDS[i]] - v[REQUIRED_FIELDS[i]]);
 	  }
 	 
 	  return sum;
@@ -148,7 +181,7 @@ public class Kmeans {
 			System.out.print("In combine: " + key.toString() + " with values = " + values.toString() + "\n");
 			
 			long num = 0;
-			Double[] feature_sum = new Double[features + 1];
+			Double[] feature_sum = new Double[features_length + 1];
 			initialize(feature_sum);
 			for (Text value : values) {
 //				System.out.print(num + value.toString() + "\n");
@@ -195,7 +228,7 @@ public class Kmeans {
 			System.out.print("In reduce: " + key.toString() + " with values = " + values.toString() + "\n");
 			
 			long num = 0;
-			Double[] feature_sum = new Double[features + 1];
+			Double[] feature_sum = new Double[features_length + 1];
 			initialize(feature_sum);
 			for (Text value : values) {
 				System.out.print(num + " " + value.toString() + "\n");
@@ -216,7 +249,7 @@ public class Kmeans {
 			}
 			System.out.print("Done with sums: " + key.toString() + " with total :" + num + "\n");
 			int i = 0;
-			Double[] center = new Double[features + 1];
+			Double[] center = new Double[features_length + 1];
 			for (Double feature : feature_sum) {
 				center[i] = feature / num;
 				i++;
@@ -265,7 +298,7 @@ public class Kmeans {
 		rjob.setInputFormatClass(TextInputFormat.class);
 		rjob.setOutputFormatClass(TextOutputFormat.class);
 		rjob.setNumReduceTasks(1);
-		rjob.setJarByClass(Kmeans.class);
+		rjob.setJarByClass(KMeans.class);
 		FileInputFormat.addInputPath(rjob, new Path(args[0]));
 		
 		FileOutputFormat.setOutputPath(rjob, new Path("outp.0"));
@@ -293,7 +326,7 @@ public class Kmeans {
 	//					 job.setPartitionerClass(WordPartitioner.class);
 	//					 job.setNumReduceTasks(5);
 			 
-			 job.setJarByClass(Kmeans.class);
+			 job.setJarByClass(KMeans.class);
 	
 		     FileInputFormat.addInputPath(job, new Path(args[0]));
 		     counter++;
