@@ -35,6 +35,24 @@ public class BatchRecommendation {
 	public static class CFMap extends
 			Mapper<LongWritable, Text, Text, Text> {
 	
+		
+		
+		//For each of the song, pull its similarity with other songs from Hbase 
+		public static HTable table;
+	    public void setup(Context context) throws IOException {
+	        System.out.print("In setup");
+	        try {
+	        	Configuration conf = HBaseConfiguration.create();
+	            table = new HTable(conf, TABLE_NAME);
+	                     
+	        } catch (Exception e1) {
+	                     // TODO Auto-generated catch block
+	                     e1.printStackTrace();
+	        }
+	}
+		
+		
+		
 		public void map(LongWritable key, Text value, Context context)
 				throws InterruptedException, IOException {
 			
@@ -53,8 +71,8 @@ public class BatchRecommendation {
             }
             
           //For each of the song, pull its similarity with other songs from Hbase 
-            Configuration conf = HBaseConfiguration.create();
-            HTable table = new HTable(conf, TABLE_NAME);
+            //Configuration conf = HBaseConfiguration.create();
+            //HTable table = new HTable(conf, TABLE_NAME);
             
             //For each song the user has listened to
             for(String parti: parts){
@@ -95,7 +113,7 @@ public class BatchRecommendation {
            	   	}
             }
             
-          		//Top Recommendations of songs based on their recommendation score
+          //Top Recommendations of songs based on their recommendation score
             		DecimalFormat d = new DecimalFormat("#.#####");
             		ValueComparator vc = new ValueComparator(recommend);
 			TreeMap<String, Double> sorted_map = new TreeMap<String, Double>(vc);
@@ -130,24 +148,25 @@ public class BatchRecommendation {
 	public static void main(String[] args) throws Exception {
 		
 	    	Configuration conf = HBaseConfiguration.create();
-	    	String[] otherArgs = new GenericOptionsParser(conf, args).getRemainingArgs();
+	    	String[] otherArgs = new GenericOptionsParser(conf, args)
+			.getRemainingArgs();
 	    	if (otherArgs.length != 1) {
-	    		System.err.println("Usage:<in>");
-	    		System.exit(2);
+	    			System.err.println("Usage:<in>");
+	    			System.exit(2);
 	    	}
 	      
 	        Job job = new Job(conf, "cf");
 	        job.setMapperClass(CFMap.class);
 	        job.setMapOutputKeyClass(Text.class);
 		job.setMapOutputValueClass(Text.class);
-			
+		
 		job.setJarByClass(BatchRecommendation.class);
 		job.setInputFormatClass(TextInputFormat.class);
 		job.setOutputFormatClass(TextOutputFormat.class);
-						
+				
 		FileInputFormat.addInputPath(job,new Path("src/projmr/usersongmap.txt"));
 		FileOutputFormat.setOutputPath(job, new Path("src/projmr/dummy"));
-				
+		
 		job.waitForCompletion(true);
 	}
 }
