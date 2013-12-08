@@ -46,10 +46,10 @@ public class BatchRecommendation {
 			String string = value.toString();
 			String[] key_value = string.split("\t");
 			String user = key_value[0].trim(); 
-            String[] parts = key_value[1].split(","); 
+            		String[] parts = key_value[1].split(","); 
 			for(String parti: parts){
-            	String[] id_counts = parti.split(":");
-            	haveListened.put(id_counts[0].trim(),Double.parseDouble(id_counts[1].trim()));        	
+            		String[] id_counts = parti.split(":");
+            		haveListened.put(id_counts[0].trim(),Double.parseDouble(id_counts[1].trim()));        	
             }
             
           //For each of the song, pull its similarity with other songs from Hbase 
@@ -84,7 +84,7 @@ public class BatchRecommendation {
 		           	   	if(!recommend.containsKey(song_val[0].trim())){
 		           	   		recommend.put(song_val[0].trim(),mux);
 		           	   	}else{
-		           	   		double mapval = recommend.get(song_val[0]);
+		           	   		double mapval = recommend.get(song_val[0].trim());
 		           	   		recommend.put(song_val[0].trim(),mapval+mux);
 		           	   	}
            	   		}//the user has already listened to this song,
@@ -95,9 +95,9 @@ public class BatchRecommendation {
            	   	}
             }
             
-          //Top Recommendations of songs based on their recommendation score
-            DecimalFormat d = new DecimalFormat("#.#####");
-            ValueComparator vc = new ValueComparator(recommend);
+          		//Top Recommendations of songs based on their recommendation score
+            		DecimalFormat d = new DecimalFormat("#.#####");
+            		ValueComparator vc = new ValueComparator(recommend);
 			TreeMap<String, Double> sorted_map = new TreeMap<String, Double>(vc);
 			sorted_map.putAll(recommend);
 			String output = "";
@@ -127,29 +127,28 @@ public class BatchRecommendation {
 			}
 		}   
 	}
-		public static void main(String[] args) throws Exception {
+	public static void main(String[] args) throws Exception {
 		
-    	Configuration conf = HBaseConfiguration.create();
-    	String[] otherArgs = new GenericOptionsParser(conf, args)
-		.getRemainingArgs();
-    	if (otherArgs.length != 1) {
-    			System.err.println("Usage:<in>");
-    			System.exit(2);
-    	}
-      
-        Job job = new Job(conf, "cf");
-        job.setJarByClass(CollaborativeFiltering.class);
-        job.setMapperClass(CFMap.class);
-        job.setMapOutputKeyClass(Text.class);
+	    	Configuration conf = HBaseConfiguration.create();
+	    	String[] otherArgs = new GenericOptionsParser(conf, args).getRemainingArgs();
+	    	if (otherArgs.length != 1) {
+	    		System.err.println("Usage:<in>");
+	    		System.exit(2);
+	    	}
+	      
+	        Job job = new Job(conf, "cf");
+	        job.setJarByClass(CollaborativeFiltering.class);
+	        job.setMapperClass(CFMap.class);
+	        job.setMapOutputKeyClass(Text.class);
 		job.setMapOutputValueClass(Text.class);
-		
+			
 		job.setJarByClass(BatchRecommendation.class);
 		job.setInputFormatClass(TextInputFormat.class);
 		job.setOutputFormatClass(TextOutputFormat.class);
-				
+						
 		FileInputFormat.addInputPath(job,new Path("src/projmr/usersongmap.txt"));
 		FileOutputFormat.setOutputPath(job, new Path("src/projmr/dummy"));
-		
+				
 		job.waitForCompletion(true);
 	}
 }
