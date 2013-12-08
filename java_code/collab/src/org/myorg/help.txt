@@ -1,0 +1,14 @@
+aws command line args:
+
+Job1:
+s3n://mrproj/job/collab.jar
+org.myorg.BuildSongsMat s3n://mrproj/input/train_triplets.txt s3n://mrproj/output/job1
+
+
+Job2:
+s3n://mrproj/job/collab.jar
+org.myorg.Collab s3n://mrproj/input/train_triplets.txt s3n://mrproj/output/job2
+
+Job3:
+s3n://mrproj/job/collab.jar
+org.myorg.CollaborativeFiltering s3n://mrproj/input/op1 s3n://mrproj/output/job3
