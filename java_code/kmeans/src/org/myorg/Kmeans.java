@@ -3,11 +3,13 @@ package org.myorg;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Random;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.DoubleWritable;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
@@ -23,6 +25,28 @@ import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 
 public class Kmeans {
 	static int K = 3, features = 2;
+	static Random generator;
+	public static class RCMap extends Mapper<LongWritable, Text, DoubleWritable, Text> {
+		public void setup(Context context) throws IOException {
+			generator = new Random();
+		}
+		
+		public void map(LongWritable key, Text value, Context context) throws InterruptedException, IOException {
+			DoubleWritable r = new DoubleWritable(generator.nextDouble());
+			System.out.print("Map with " + key.toString());
+			context.write(r, value);
+		}
+	}
+	
+	public static class RCRed extends Reducer<DoubleWritable, Text, DoubleWritable, Text> {
+		public void reduce(DoubleWritable key, Iterable<Text> values, Context context) 
+			     throws IOException, InterruptedException {
+			System.out.print("Reduce with " + key.toString());
+			for (Text value : values) {
+				context.write(key, value);
+			}
+		}
+	}
 	
 	public static final double measureDistance(Double[] center, Double[]  v) {
 	  double sum = 0;
@@ -38,15 +62,17 @@ public class Kmeans {
 	public static Double[][] load_centers(FileSystem fs, String subPath) throws IOException {
         String line;
         Double[][] temp_centers = new Double[K][];
-//        System.out.print("In load_centers\n");
+        System.out.print("In load_centers\n");
 		FSDataInputStream cache = fs.open(new Path("/user/dave/" + subPath  + "/part-r-00000"));
 	   try {
 		   int i = 0;
-		   while((line = cache.readLine()) != null ){
+		   while((line = cache.readLine()) != null && i < K){
+			   System.out.print(line + "\n");
                String[] parts = line.trim().split(" |\t");
-               temp_centers[i] = new Double[parts.length];
-               for (int j = 0; j < parts.length; j++) {
-            	   temp_centers[i][j] = Double.parseDouble(parts[j]);
+               // Ignore the first number as it is the random number
+               temp_centers[i] = new Double[parts.length - 1];
+               for (int j = 1; j < parts.length; j++) {
+            	   temp_centers[i][j-1] = Double.parseDouble(parts[j]);
                }
                i++;
 		   }
@@ -54,7 +80,7 @@ public class Kmeans {
 	                   // TODO Auto-generated catch block
 	            e.printStackTrace();
 	   }
-//       System.out.print("End of load_centers\n");		   
+       System.out.print("End of load_centers\n");		   
 	   return temp_centers;
 	}
 	
@@ -70,7 +96,7 @@ public class Kmeans {
 					// TODO Auto-generated catch block
 					e1.printStackTrace();
 			   }
-			   System.out.print(centers[0][0] + "," + centers[0][1] + "," + centers[1][0] + "," + centers[1][1] + "\n");
+			   System.out.print(centers[0][0] + "," + centers[0][1] + "," + centers[1][0] + "," + centers[1][1] + "," + centers[2][0] + "," + centers[2][1] + "\n");
 		   }
 		
 		public void map(LongWritable key, Text value, Context context) throws InterruptedException, IOException {
@@ -211,6 +237,28 @@ public class Kmeans {
 	public static void main(String[] args) throws Exception {
 		long counter = 0;
 		long max_itr = 10;
+		
+		Configuration rconf = new Configuration();
+		Job rjob = new Job(rconf, "randcent");
+		FileSystem fs = FileSystem.get(new URI("/user/dave"), rconf);
+		fs.delete(new Path("outp.0"), true);
+		rjob.setOutputKeyClass(DoubleWritable.class);
+		rjob.setOutputValueClass(Text.class);
+		rjob.setMapperClass(RCMap.class);
+		rjob.setReducerClass(RCRed.class);
+		rjob.setMapOutputKeyClass(DoubleWritable.class);
+		rjob.setMapOutputValueClass(Text.class);
+		rjob.setInputFormatClass(TextInputFormat.class);
+		rjob.setOutputFormatClass(TextOutputFormat.class);
+		rjob.setNumReduceTasks(1);
+		rjob.setJarByClass(Kmeans.class);
+		FileInputFormat.addInputPath(rjob, new Path(args[0]));
+		
+		FileOutputFormat.setOutputPath(rjob, new Path("outp.0"));
+		rjob.waitForCompletion(true);
+		
+		System.out.print("Finished with job1");
+		
 		while (!converged(counter) && counter < max_itr) {
 			 Configuration conf = new Configuration();
 			 conf.set("my.centers.path", "outp." + String.valueOf(counter));	
