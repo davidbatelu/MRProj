@@ -8,7 +8,10 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Random;
+
 import static java.lang.Math.pow;
 
 import org.apache.hadoop.conf.Configuration;
@@ -28,42 +31,74 @@ import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 
+import au.com.bytecode.opencsv.CSVParser;
+
 
 public class Kmeans {
 	
 	static final int ARTIST_FAMILIARITY = 0; 
+
 	static final int ARTIST_HOTNESS = 1;
+
 	static final int ARTIST_ID = 2;
+
 	static final int ARTIST_LATITUDE = 3;
+
 	static final int ARTIST_LONGITITUDE = 4;
+
 	static final int ARTIST_LOCATION = 5;
+
 	static final int ARTIST_NAME = 6;
+
 	static final int RELEASE = 7;
+
 	static final int SONG_HOTNESS = 8;
+
 	static final int TITLE = 9;
+
 	static final int SONG_ID = 10;
+
 	static final int DANCEABILITY = 11;
+
 	static final int ENERGY = 12;
-	static final int ARTISTS_TERMS_FREQ_LENGTH = 12;
-	static final int ARTISTS_TERMS_FREQ_ELEM = 13;
-	static final int DURATION = 14;
-	static final int KEY = 15;
-	static final int LOUDNESS = 16;
-	static final int MODE = 17;
-	static final int TEMPO = 18;
-	static final int TIME_SIGNATURE = 19;
-	static final int SEGMENT_LOUDNESS = 20;
-	static final int SEGMENT_TIMBRE = 21;
-	static final int YEAR = 22;
-	static final int GENRE = 23;
-	static final int SIMILAR_ARTISTS = 24;
-	static final int ARTIST_TERMS = 25;
+
+	static final int ARTISTS_TERMS_FREQ_LENGTH = 13;
+
+	static final int ARTISTS_TERMS_FREQ_ELEM = 14;
+
+	static final int DURATION = 15;
+
+	static final int KEY = 16;
+
+	static final int LOUDNESS = 17;
+
+	static final int MODE = 18;
+
+	static final int TEMPO = 19;
+
+	static final int TIME_SIGNATURE = 20;
+
+	static final int SEGMENT_LOUDNESS = 21;
+
+	static final int SEGMENT_TIMBRE = 22;
+
+	static final int YEAR = 23;
+
+	static final int GENRE = 24;
+
+	static final int SIMILAR_ARTISTS = 25;
+
+	static final int ARTIST_TERMS = 26;
 	
 	// All numerical features
-	static final Integer []REQUIRED_FIELDS = {ARTIST_FAMILIARITY, ARTIST_HOTNESS, SONG_HOTNESS, DANCEABILITY, ENERGY, 
+	static Integer []REQUIRED_FIELDS = {ARTIST_FAMILIARITY, ARTIST_HOTNESS, SONG_HOTNESS, DANCEABILITY, ENERGY, 
 		DURATION, KEY, LOUDNESS, MODE, TEMPO, TIME_SIGNATURE, SEGMENT_LOUDNESS, SEGMENT_TIMBRE, YEAR};
 	
-	static int K = 3, features_length = 26; 
+	static List<Integer> REQUIRED_LIST = Arrays.asList(ARTIST_FAMILIARITY, ARTIST_HOTNESS, SONG_HOTNESS, DANCEABILITY, ENERGY, 
+			DURATION, KEY, LOUDNESS, MODE, TEMPO, TIME_SIGNATURE, SEGMENT_LOUDNESS, SEGMENT_TIMBRE, YEAR);
+	
+	static int K = 10, features_length = 27; 
+	static Double CONVERGENCE_DIFF = (double) 1;
 	static Random generator;
 	static long MAX_ITR = 10;
 	public static class RCMap extends Mapper<LongWritable, Text, DoubleWritable, Text> {
@@ -83,36 +118,54 @@ public class Kmeans {
 			     throws IOException, InterruptedException {
 			System.out.print("Reduce with " + key.toString());
 			for (Text value : values) {
-				context.write(value, new Text(""));
+				// Instead of "1" could put a counter value here
+				context.write(new Text(value.toString() + ",1"), new Text());
 			}
 		}
 	}
 	
-	public static final double measureDistance(Double[] center, Double[]  v) {
+	public static String combine(String[] s, String glue)
+	{
+	  int k=s.length;
+	  if (k==0)
+	    return null;
+	  StringBuilder out=new StringBuilder();
+	  out.append(s[0]);
+	  for (int x=1;x<k;++x)
+	    out.append(glue).append(s[x]);
+	  return out.toString();
+	}
+	
+	public static final double measureDistance(String[] centers, String[] row) {
 	  double sum = 0;
 	  // Ignore last label
 	  for (int i = 0; i < REQUIRED_FIELDS.length ; i++) {
-		  sum += Math.abs(center[REQUIRED_FIELDS[i]] - v[REQUIRED_FIELDS[i]]);
+//		  if (centers[REQUIRED_FIELDS[i]].isEmpty() || row[REQUIRED_FIELDS[i]].isEmpty()) {
+//			  continue;
+//		  }
+		  sum += Math.abs(Double.parseDouble(centers[REQUIRED_FIELDS[i]]) - Double.parseDouble(row[REQUIRED_FIELDS[i]]));
 	  }
 	 
 	  return sum;
 	}
 	
 	@SuppressWarnings("deprecation")
-	public static Double[][] load_centers(FileSystem fs, String subPath) throws IOException {
+	public static String[][] load_centers(FileSystem fs, String subPath) throws IOException {
         String line;
-        Double[][] temp_centers = new Double[K][];
+        String[][] temp_centers = new String[K][];
         System.out.print("In load_centers\n");
 		FSDataInputStream cache = fs.open(new Path("/user/dave/" + subPath  + "/part-r-00000"));
 	   try {
 		   int i = 0;
+		   CSVParser csv = new CSVParser((char)',');
 		   while((line = cache.readLine()) != null && i < K){
 			   System.out.print(line + "\n");
-               String[] parts = line.trim().split(" |\t");
+//               String[] parts = line.trim().split(" |\t");
+			   String[] parts = csv.parseLine(line);
                // Ignore the first number as it is the random number
-               temp_centers[i] = new Double[parts.length];
+               temp_centers[i] = new String[parts.length];
                for (int j = 0; j < parts.length; j++) {
-            	   temp_centers[i][j] = Double.parseDouble(parts[j]);
+            	   temp_centers[i][j] = parts[j];
                }
                i++;
 		   }
@@ -125,7 +178,7 @@ public class Kmeans {
 	}
 	
 	public static class KMap extends Mapper<LongWritable, Text, IntWritable, Text> {
-		static Double[][] centers;	
+		static String[][] centers;	
 		public void setup(Context context) throws IOException {
 			   System.out.print("In setup\n");
 			   FileSystem fs;
@@ -136,37 +189,71 @@ public class Kmeans {
 					// TODO Auto-generated catch block
 					e1.printStackTrace();
 			   }
-			   System.out.print(centers[0][0] + "," + centers[0][1] + "," + centers[1][0] + "," + centers[1][1] + "," + centers[2][0] + "," + centers[2][1] + "\n");
+//			   System.out.print(centers[0][0] + "," + centers[0][1] + "," + centers[1][0] + "," + centers[1][1] + "," + centers[2][0] + "," + centers[2][1] + "\n");
 		   }
 		
 		public void map(LongWritable key, Text value, Context context) throws InterruptedException, IOException {
-			String[] parts = value.toString().split(" |\t");
-			Double[] row = new Double[parts.length];
+//			String[] parts = value.toString().split(" |\t");
+			System.out.print("Working on : " + key.toString() + "\n");
+			CSVParser csv = new CSVParser((char)',');
+			String[] parts = csv.parseLine(value.toString());
+			String[] row = new String[parts.length];
 			int i = 0, minIdx = -1;
 			double min = 99999999.0;
 			for (String part : parts) {
-				row[i] = new Double(part);
+				row[i] = new String(part);
 				i++;
 			}
 			for (int c = 0; c < centers.length; c++) {
-				double curDst = measureDistance(centers[c], row);
-				if (curDst < min) {
-					min = curDst;
-					minIdx = c;
+				try {
+					double curDst = measureDistance(centers[c], row);
+					if (curDst < min) {
+						min = curDst;
+						minIdx = c;
+					}
+				}  catch (Exception e) {
+					  System.out.print(e + "\nIN MEASURE!!!!\n");
+					  System.out.print(combine(centers[c], ",")+"\n" + combine(row, ",") + "\n");
+					  System.exit(1);
 				}
+				
 			}
 			// here 1 is the count of values aggregated into value
-			context.write(new IntWritable(minIdx), new Text("1 " + value.toString()));
+			context.write(new IntWritable(minIdx), new Text("1," + value.toString()));
 		}
 		
 	}
 	
-	
-	
-	public static void initialize(Double[] arr) {
+	public static void initialize(String[] arr) {
 		for (int i = 0; i < arr.length; i++) {
-			arr[i] = 0.0;
+			arr[i] = "0";
 		}
+	}
+	
+	public static String[] sum_features(String[] f1, String f2[]) {
+		System.out.print("Inside sum_features\n");
+		String[] sum = new String[f1.length];
+		initialize(sum);
+//		System.out.print(combine(sum, ",") + "\n");
+		int i = 0;
+		for (; i < f1.length; i++) {
+//			System.out.print("Inside sum_features with i = " + i + "\n");
+//			if (Arrays.asList(REQUIRED_FIELDS).contains(i)) {
+//				sum[i] = String.valueOf(Double.parseDouble(f1[i]) + Double.parseDouble(f2[i]));
+//			} else {
+//				sum[i] = f2[i];
+//			}
+//			for (Integer val : REQUIRED_FIELDS) {
+//				System.out.print("val - " + val.toString() + "\n");
+				if (REQUIRED_LIST.contains(i)) {
+//					System.out.print(combine(f1, ",") + "\n");
+//					System.out.print(combine(f2, ",") + "\n");
+//					System.out.print(Double.parseDouble(f1[i]) + ":" + Double.parseDouble(f2[i+1]) + "\n");
+					sum[i]  = String.valueOf(Double.parseDouble(f1[i]) + Double.parseDouble(f2[i+1]));
+				}
+//			}
+		}
+		return sum;
 	}
 	
 	public static class KComb extends Reducer<IntWritable, Text, IntWritable, Text> {
@@ -188,35 +275,44 @@ public class Kmeans {
 			System.out.print("In combine: " + key.toString() + " with values = " + values.toString() + "\n");
 			
 			long num = 0;
-			Double[] feature_sum = new Double[features_length + 1];
+			String[] feature_sum = new String[features_length + 1];
 			initialize(feature_sum);
+			System.out.print("Starting sum\n");
 			for (Text value : values) {
+				System.out.print(value.toString() + "\n");
 //				System.out.print(num + value.toString() + "\n");
-				String[] parts = value.toString().split(" |\t");
+//				String[] parts = value.toString().split(" |\t");
 //				System.out.print(num + value.toString() + "\n");
-				int i = 0;
-				for (String part : parts) {
-					if (i == 0) {
-						num += Long.parseLong(part);
-						i++;
-						continue;
-					}
-//					System.out.print(part + "\n");
-//					System.out.print(feature_sum[i] + "\n");
-					feature_sum[i-1] += Double.parseDouble(part);
-					i++;
-				}
+				CSVParser csv = new CSVParser((char)',');
+				String[] parts = csv.parseLine(value.toString());
+//				int i = 0;
+				
+				// Could break here
+				feature_sum = sum_features(feature_sum, parts);
+				num += Long.parseLong(parts[0]);
+//				for (String part : parts) {
+//					if (i == 0) {
+//						num += Long.parseLong(part);
+//						i++;
+//						continue;
+//					}
+////					System.out.print(part + "\n");
+////					System.out.print(feature_sum[i] + "\n");
+//					feature_sum[i-1] += Double.parseDouble(part);
+//					i++;
+//				}
 				
 			}
-			String feature_str = num + " ";
-			for (Double feature : feature_sum) {
-				feature_str += feature.toString() + " ";
+			System.out.print("Starting out\n");
+			String feature_str = num + ",";
+			for (String feature : feature_sum) {
+				feature_str += feature + ",";
 			}
 			context.write(key, new Text(feature_str.substring(0, feature_str.length()-1)));
 		}
 	}
 	
-	public static class KRed extends Reducer<IntWritable, Text, Text, IntWritable> {
+	public static class KRed extends Reducer<IntWritable, Text, Text, Text> {
 //		static Double[][] centers;
 //		public void setup(Context context) throws IOException {
 //			   System.out.print("In setup\n");
@@ -234,35 +330,50 @@ public class Kmeans {
 			     throws IOException, InterruptedException {
 			System.out.print("In reduce: " + key.toString() + " with values = " + values.toString() + "\n");
 			
+//			long num = 0;
+//			Double[] feature_sum = new Double[features_length];
+//			initialize(feature_sum);
+//			for (Text value : values) {
+//				System.out.print(num + " " + value.toString() + "\n");
+//				String[] parts = value.toString().split(" |\t");
+//				System.out.print(num + " " + value.toString() + "\n");
+//				int i = 0;
+//				for (String part : parts) {
+//					if (i == 0) {
+//						num += Long.parseLong(part);
+//						i++;
+//						continue;
+//					}
+//					System.out.print(part + "\n");
+//					System.out.print(feature_sum[i-1] + "\n");
+//					feature_sum[i-1] += Double.parseDouble(part);
+//					i++;
+//				}
+//			}
 			long num = 0;
-			Double[] feature_sum = new Double[features_length + 1];
+			String[] feature_sum = new String[features_length + 1];
 			initialize(feature_sum);
 			for (Text value : values) {
-				System.out.print(num + " " + value.toString() + "\n");
-				String[] parts = value.toString().split(" |\t");
-				System.out.print(num + " " + value.toString() + "\n");
-				int i = 0;
-				for (String part : parts) {
-					if (i == 0) {
-						num += Long.parseLong(part);
-						i++;
-						continue;
-					}
-					System.out.print(part + "\n");
-					System.out.print(feature_sum[i-1] + "\n");
-					feature_sum[i-1] += Double.parseDouble(part);
-					i++;
-				}
+				CSVParser csv = new CSVParser((char)',');
+				String[] parts = csv.parseLine(value.toString());
+			
+				// Could break here
+				feature_sum = sum_features(feature_sum, Arrays.copyOfRange(parts, 1, parts.length));
+				num += Long.parseLong(parts[0]);				
 			}
 			System.out.print("Done with sums: " + key.toString() + " with total :" + num + "\n");
 			int i = 0;
-			Double[] center = new Double[features_length + 1];
-			for (Double feature : feature_sum) {
-				center[i] = feature / num;
+			String center = "";
+			for (String feature : feature_sum) {
+				if (Arrays.asList(REQUIRED_FIELDS).contains(i)) {
+					center += String.valueOf(Double.parseDouble(feature) / num) + ",";
+				} else {
+					center += feature + ",";
+				}
 				i++;
 			}
-			System.out.print("Wrote out reduce: " + key.toString() + "\n");
-			context.write(new Text(center[0] +" " + center[1]), key);
+			System.out.print("Wrote out reduce: " + key.toString() + " : " + center + "\n");
+			context.write(new Text(center.substring(0, center.length()-1) + "," + key.toString()), new Text());
 		}
 	}
 	
@@ -279,7 +390,7 @@ public class Kmeans {
 		br.close();
 	}
 	
-	public static String read_from_file(String fn, FileSystem fs) throws IOException {
+	public static String read_from_file(String fn, FileSystem fs, boolean keep_lines) throws IOException {
 		Path pt = new Path(fn);
         BufferedReader br = new BufferedReader(new InputStreamReader(fs.open(pt)));
         String line;
@@ -287,6 +398,9 @@ public class Kmeans {
         line=br.readLine();
         while (line != null){
             buf += line;
+            if (keep_lines) {
+            	buf += "\n";
+            }
         	line=br.readLine();    
         }
         return buf;
@@ -299,6 +413,7 @@ public class Kmeans {
 			for (Text value : values) {
 				count++;
 				String s = value.toString();
+				// Ignore "1," in the beginning of value
 				context.write(new Text(s.substring(2, s.length())), new Text());
 			}
 			System.out.print("Count for " + key.toString() + " is " + count.toString() + "\n");
@@ -320,16 +435,22 @@ public class Kmeans {
 		if (counter <= 2) {
 			return false;
 		} else {
-			Double[][] centers_new = load_centers(fs, base + counter);
-			Double[][] centers_old = load_centers(fs, base + (counter-1));
+			String[][] centers_new = load_centers(fs, base + counter);
+			String[][] centers_old = load_centers(fs, base + (counter-1));
 			for (int i =0; i < centers_new.length; i++) {
 				double cur_diff = 0;
+				if (!Arrays.asList(REQUIRED_FIELDS).contains(i)) {
+					continue;
+				}
 				for (int j = 0; j < centers_new[i].length; j++) {
-					double diff = centers_new[i][j] - centers_old[i][j];
+					if (!Arrays.asList(REQUIRED_FIELDS).contains(j)) {
+						continue;
+					}	
+					Double diff = Double.parseDouble(centers_new[i][j]) - Double.parseDouble(centers_old[i][j]);
 					diff = (diff < 0) ? -diff : diff;
 					cur_diff += diff;
 				}
-				if ( cur_diff > 1 ) {
+				if ( cur_diff > CONVERGENCE_DIFF ) {
 					conv = false;
 				}
 			}
@@ -361,15 +482,16 @@ public class Kmeans {
 	public static void main(String[] args) throws Exception {
 		int failures = 0;
 		int level = 0, Max_Levels = 2;
-		
+		boolean exit = false;
 		// keep a higher permissible dev
 		float Max_Dev = (float) 0.5;
 		boolean redo;
 		Configuration dummy_conf = new Configuration();
 		FileSystem fs = FileSystem.get(new URI("/user/dave"), dummy_conf);
+		int kmeans_redo;
+		int kmeans_max_redo = 2;
 		
-		
-		while (level < Max_Levels) {
+		while (!exit && level < Max_Levels) {
 			System.out.print("***********************************************************************\n");
 			System.out.print("***********************************************************************\n");
 			System.out.print("LEVEL - " + level + "\n");
@@ -377,7 +499,7 @@ public class Kmeans {
 			System.out.print("***********************************************************************\n");
 			int iterations = (int) pow(K, level);
 			System.out.print("ITERATIONS ARE - " + iterations + "\n");
-			for (int itr = 0; itr < iterations; itr++) {
+			for (int itr = 0; itr < iterations && !exit; itr++) {
 				System.out.print("***********************************************************************\n");
 				System.out.print("LEVEL - " + level + "    ITR - " + itr + "\n");
 				System.out.print("***********************************************************************\n");
@@ -409,7 +531,8 @@ public class Kmeans {
 					
 					
 					// K-Means
-					while (!converged(level + "." + itr + ".cent.", counter, fs) && counter < MAX_ITR) {
+					kmeans_redo = 0;
+					while (!converged(level + "." + itr + ".cent.", counter, fs) && counter < MAX_ITR && !exit) {
 						 Configuration conf = new Configuration();
 						 conf.set("my.centers.path", level + "." + itr + ".cent." + String.valueOf(counter));	
 						 Job job = new Job(conf, "kmeans");
@@ -445,6 +568,17 @@ public class Kmeans {
 					    		 System.exit(0);
 					    	 }
 					     }
+					     String OP = read_from_file(level + "." + itr + ".cent." + counter + "/part-r-00000", fs, true);
+					     if (OP.split("\n").length != K) {
+					    	 System.out.print("NOT GOING WELL!!!! ---- " + OP + "\n");
+					    	 
+					    	 counter--;
+					    	 kmeans_redo++;
+					    	 if (kmeans_redo > kmeans_max_redo) {
+					    		 exit = true;
+					    		 break;
+					    	 }
+					     }
 					}
 					
 					// Actual splits
@@ -474,8 +608,8 @@ public class Kmeans {
 				     Long[] counts = new Long[K];
 				     Long sum = 0L;
 				     for (Integer i = 0; i < K; i++) {
-				    	 System.out.print("Count string " + i.toString() + " : " + read_from_file(level + "." + itr + ".count."+ i.toString(), fs) + "\n");
-						 counts[i] = new Long(read_from_file(level + "." + itr + ".count."+ i.toString(), fs));
+				    	 System.out.print("Count string " + i.toString() + " : " + read_from_file(level + "." + itr + ".count."+ i.toString(), fs, false) + "\n");
+						 counts[i] = new Long(read_from_file(level + "." + itr + ".count."+ i.toString(), fs, false));
 						 sum += counts[i];
 					 }
 				     Long avg = sum / K;
@@ -494,6 +628,9 @@ public class Kmeans {
 				} // redo loop
 			} // itr loop
 			level++;
+		}
+		if (exit) {
+			System.out.print("BAD EXIT!!\n");
 		}
 	 }
 }
