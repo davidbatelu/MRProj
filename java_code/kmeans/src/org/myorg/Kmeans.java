@@ -101,6 +101,10 @@ public class Kmeans {
 	static Double CONVERGENCE_DIFF = (double) 1;
 	static Random generator;
 	static long MAX_ITR = 10;
+	
+	// Random Points Generator Job.
+	// This job is associates every data point with a random number between 0 and 1.
+	// We use that random number to pick the top K jobs.
 	public static class RCMap extends Mapper<LongWritable, Text, DoubleWritable, Text> {
 		public void setup(Context context) throws IOException {
 			generator = new Random();
@@ -124,6 +128,8 @@ public class Kmeans {
 		}
 	}
 	
+	// Helper function used for concatenating a string array
+	// Primarily used for debugging
 	public static String combine(String[] s, String glue)
 	{
 	  int k=s.length;
@@ -136,6 +142,8 @@ public class Kmeans {
 	  return out.toString();
 	}
 	
+	
+	// The main distance function calculation. Given two points it calculates the distance between them
 	public static final double measureDistance(String[] centers, String[] row) {
 	  double sum = 0;
 	  // Ignore last label
@@ -145,10 +153,10 @@ public class Kmeans {
 //		  }
 		  sum += Math.abs(Double.parseDouble(centers[REQUIRED_FIELDS[i]]) - Double.parseDouble(row[REQUIRED_FIELDS[i]]));
 	  }
-	 
 	  return sum;
 	}
 	
+	// Function to load the current centers (for this iteration of K-Means) into memory.
 	@SuppressWarnings("deprecation")
 	public static String[][] load_centers(FileSystem fs, String subPath) throws IOException {
         String line;
@@ -160,9 +168,9 @@ public class Kmeans {
 		   CSVParser csv = new CSVParser((char)',');
 		   while((line = cache.readLine()) != null && i < K){
 			   System.out.print(line + "\n");
-//               String[] parts = line.trim().split(" |\t");
 			   String[] parts = csv.parseLine(line);
-               // Ignore the first number as it is the random number
+
+			   // Ignore the first number as it is the random number
                temp_centers[i] = new String[parts.length];
                for (int j = 0; j < parts.length; j++) {
             	   temp_centers[i][j] = parts[j];
@@ -170,13 +178,14 @@ public class Kmeans {
                i++;
 		   }
 	   } catch (IOException e) {
-	                   // TODO Auto-generated catch block
 	            e.printStackTrace();
 	   }
        System.out.print("End of load_centers\n");		   
 	   return temp_centers;
 	}
 	
+	// The K-Means job. 
+	// The mapper is responsible for emitting the index of the closest center
 	public static class KMap extends Mapper<LongWritable, Text, IntWritable, Text> {
 		static String[][] centers;	
 		public void setup(Context context) throws IOException {
@@ -230,25 +239,16 @@ public class Kmeans {
 		}
 	}
 	
+	// Helper function that is used to add two data points. 
+	// It considers only those fields present in the REQUIRED_LIST, ignoring 
+	// the rest
 	public static String[] sum_features(String[] f1, String f2[]) {
 		System.out.print("Inside sum_features\n");
 		String[] sum = new String[f1.length];
 		initialize(sum);
-//		System.out.print(combine(sum, ",") + "\n");
 		int i = 0;
 		for (; i < f1.length; i++) {
-//			System.out.print("Inside sum_features with i = " + i + "\n");
-//			if (Arrays.asList(REQUIRED_FIELDS).contains(i)) {
-//				sum[i] = String.valueOf(Double.parseDouble(f1[i]) + Double.parseDouble(f2[i]));
-//			} else {
-//				sum[i] = f2[i];
-//			}
-//			for (Integer val : REQUIRED_FIELDS) {
-//				System.out.print("val - " + val.toString() + "\n");
 				if (REQUIRED_LIST.contains(i)) {
-//					System.out.print(combine(f1, ",") + "\n");
-//					System.out.print(combine(f2, ",") + "\n");
-//					System.out.print(Double.parseDouble(f1[i]) + ":" + Double.parseDouble(f2[i+1]) + "\n");
 					sum[i]  = String.valueOf(Double.parseDouble(f1[i]) + Double.parseDouble(f2[i+1]));
 				}
 //			}
@@ -256,20 +256,9 @@ public class Kmeans {
 		return sum;
 	}
 	
+	// The combiner just adds data points to form an aggregated data point 
+	// This aggregated data point is used to calculate the new center
 	public static class KComb extends Reducer<IntWritable, Text, IntWritable, Text> {
-//		static Double[][] centers;
-//		public void setup(Context context) throws IOException {
-//			   System.out.print("In setup\n");
-//			   FileSystem fs;
-//			   try {
-//					fs = FileSystem.get(new URI("/user/dave"),context.getConfiguration());
-//					centers = load_centers(fs);
-//			   } catch (URISyntaxException e1) {
-//					// TODO Auto-generated catch block
-//					e1.printStackTrace();
-//			   }
-//			   System.out.print(centers[0][0] + "," + centers[0][1] + "," + centers[1][0] + "," + centers[1][1] + "\n");
-//		}
 		public void reduce(IntWritable key, Iterable<Text> values, Context context) 
 			     throws IOException, InterruptedException {
 			System.out.print("In combine: " + key.toString() + " with values = " + values.toString() + "\n");
@@ -280,27 +269,12 @@ public class Kmeans {
 			System.out.print("Starting sum\n");
 			for (Text value : values) {
 				System.out.print(value.toString() + "\n");
-//				System.out.print(num + value.toString() + "\n");
-//				String[] parts = value.toString().split(" |\t");
-//				System.out.print(num + value.toString() + "\n");
 				CSVParser csv = new CSVParser((char)',');
 				String[] parts = csv.parseLine(value.toString());
-//				int i = 0;
 				
 				// Could break here
 				feature_sum = sum_features(feature_sum, parts);
 				num += Long.parseLong(parts[0]);
-//				for (String part : parts) {
-//					if (i == 0) {
-//						num += Long.parseLong(part);
-//						i++;
-//						continue;
-//					}
-////					System.out.print(part + "\n");
-////					System.out.print(feature_sum[i] + "\n");
-//					feature_sum[i-1] += Double.parseDouble(part);
-//					i++;
-//				}
 				
 			}
 			System.out.print("Starting out\n");
@@ -312,44 +286,13 @@ public class Kmeans {
 		}
 	}
 	
+	// K-Means Reducer
+	// The reducer calculates the new center
 	public static class KRed extends Reducer<IntWritable, Text, Text, Text> {
-//		static Double[][] centers;
-//		public void setup(Context context) throws IOException {
-//			   System.out.print("In setup\n");
-//			   FileSystem fs;
-//			   try {
-//					fs = FileSystem.get(new URI("/user/dave"),context.getConfiguration());
-//					centers = load_centers(fs);
-//			   } catch (URISyntaxException e1) {
-//					// TODO Auto-generated catch block
-//					e1.printStackTrace();
-//			   }
-//			   System.out.print(centers[0][0] + "," + centers[0][1] + "," + centers[1][0] + "," + centers[1][1] + "\n");
-//		}
 		public void reduce(IntWritable key, Iterable<Text> values, Context context) 
 			     throws IOException, InterruptedException {
 			System.out.print("In reduce: " + key.toString() + " with values = " + values.toString() + "\n");
-			
-//			long num = 0;
-//			Double[] feature_sum = new Double[features_length];
-//			initialize(feature_sum);
-//			for (Text value : values) {
-//				System.out.print(num + " " + value.toString() + "\n");
-//				String[] parts = value.toString().split(" |\t");
-//				System.out.print(num + " " + value.toString() + "\n");
-//				int i = 0;
-//				for (String part : parts) {
-//					if (i == 0) {
-//						num += Long.parseLong(part);
-//						i++;
-//						continue;
-//					}
-//					System.out.print(part + "\n");
-//					System.out.print(feature_sum[i-1] + "\n");
-//					feature_sum[i-1] += Double.parseDouble(part);
-//					i++;
-//				}
-//			}
+
 			long num = 0;
 			String[] feature_sum = new String[features_length + 1];
 			initialize(feature_sum);
@@ -377,19 +320,17 @@ public class Kmeans {
 		}
 	}
 	
+	// Helper function to write to a file in hdfs
 	public static void write_to_file(String fn, FileSystem fs, String buf) throws IOException {
 		Path file = new Path(fn);
 		if ( fs.exists( file )) { fs.delete( file, true ); } 
 		OutputStream os = fs.create(file);
-//		    new Progressable() {
-//		        public void progress() {
-//		            out.println("...bytes written: [ "+bytesWritten+" ]");
-//		        } });
 		BufferedWriter br = new BufferedWriter( new OutputStreamWriter( os, "UTF-8" ) );
 		br.write(buf);
 		br.close();
 	}
 	
+	// Helper function to read from an hdfs file
 	public static String read_from_file(String fn, FileSystem fs, boolean keep_lines) throws IOException {
 		Path pt = new Path(fn);
         BufferedReader br = new BufferedReader(new InputStreamReader(fs.open(pt)));
@@ -406,6 +347,9 @@ public class Kmeans {
         return buf;
 	}
 	
+	// Reducer for the Summarizer job.
+	// The summarize job is responsible to splitting the data set into K parts, 
+	// based on the centers we calculate using K-Means
 	public static class SRed extends Reducer<IntWritable, Text, Text, Text> {
 		public void reduce(IntWritable key, Iterable<Text> values, Context context) 
 			     throws IOException, InterruptedException {
@@ -430,6 +374,7 @@ public class Kmeans {
 		}
 	}
 	
+	// Helper function to check if K-Menas has converged
 	public static boolean converged(String base,long counter, FileSystem fs) throws IOException {
 		boolean conv = true;
 		if (counter <= 2) {
@@ -439,11 +384,11 @@ public class Kmeans {
 			String[][] centers_old = load_centers(fs, base + (counter-1));
 			for (int i =0; i < centers_new.length; i++) {
 				double cur_diff = 0;
-				if (!Arrays.asList(REQUIRED_FIELDS).contains(i)) {
+				if (REQUIRED_LIST.contains(i)) {
 					continue;
 				}
 				for (int j = 0; j < centers_new[i].length; j++) {
-					if (!Arrays.asList(REQUIRED_FIELDS).contains(j)) {
+					if (REQUIRED_LIST.contains(j)) {
 						continue;
 					}	
 					Double diff = Double.parseDouble(centers_new[i][j]) - Double.parseDouble(centers_old[i][j]);
@@ -458,6 +403,7 @@ public class Kmeans {
 		return conv;
 	}
 	
+	// Helper function to create the random centers job
 	public static boolean random_centers(FileSystem fs, int level, int itr, String ip) throws IOException, InterruptedException, ClassNotFoundException {
 		Configuration rconf = new Configuration();
 		Job rjob = new Job(rconf, "randcent");
@@ -491,24 +437,23 @@ public class Kmeans {
 		int kmeans_redo;
 		int kmeans_max_redo = 2;
 		
+		
+		// The main K-Means driver code.
+		// This code tries to orchestrate the creation of good clusters.
+		// We try and form a K sub clusters for the data set, and then further split 
+		// these K clusters into K sub clusters (each).
+		// If the cluster is not to our liking, we try to rerun the job for that data set.
 		while (!exit && level < Max_Levels) {
-			System.out.print("***********************************************************************\n");
-			System.out.print("***********************************************************************\n");
 			System.out.print("LEVEL - " + level + "\n");
-			System.out.print("***********************************************************************\n");
-			System.out.print("***********************************************************************\n");
 			int iterations = (int) pow(K, level);
 			System.out.print("ITERATIONS ARE - " + iterations + "\n");
 			for (int itr = 0; itr < iterations && !exit; itr++) {
-				System.out.print("***********************************************************************\n");
 				System.out.print("LEVEL - " + level + "    ITR - " + itr + "\n");
-				System.out.print("***********************************************************************\n");
 				redo = true;
 				int redo_cnt = 0;
 				while (redo && redo_cnt < 3) {
 					long counter = 0;
 					redo = false;
-					// Random Centers
 					int p = itr / K;
 					String input_fn;
 					if (level == 0) {
@@ -516,6 +461,7 @@ public class Kmeans {
 					} else {
 						input_fn = (level - 1) + "." + p + ".ip/part-r-0000" + (itr % K);
 					}
+					// Random Centers job
 					boolean ret_val = random_centers(fs, level, itr, input_fn);
 					if (!ret_val) {
 						System.out.print("RANDOM CENTERS JOB FAILURE!!!");
@@ -530,7 +476,7 @@ public class Kmeans {
 					System.out.print("Finished with random centers");
 					
 					
-					// K-Means
+					// K-Means job
 					kmeans_redo = 0;
 					while (!converged(level + "." + itr + ".cent.", counter, fs) && counter < MAX_ITR && !exit) {
 						 Configuration conf = new Configuration();
@@ -546,8 +492,6 @@ public class Kmeans {
 						 job.setOutputFormatClass(TextOutputFormat.class);
 						 // The combiner involves extra parsing, so not using it may actually be more efficient
 						 job.setCombinerClass(KComb.class);
-				//					 job.setPartitionerClass(WordPartitioner.class);
-				//					 job.setNumReduceTasks(5);
 						 
 						 job.setJarByClass(Kmeans.class);
 				
@@ -581,13 +525,11 @@ public class Kmeans {
 					     }
 					}
 					
-					// Actual splits
+					 // Actual splits
+					 // The summarize job
 					 Configuration sconf = new Configuration();
 					 sconf.set("my.centers.path", level + "." + itr + ".cent." + String.valueOf(counter));
 					 sconf.set("base_dir", level + "." + itr);
-		//			 for (Integer i = 0; i < K; i++) {
-		//				 sconf.set("count."+i.toString(), "0");
-		//			 }
 					 Job sjob = new Job(sconf, "datasplit");
 					 sjob.setOutputKeyClass(Text.class);
 					 sjob.setOutputValueClass(Text.class);
